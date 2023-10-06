@@ -1,0 +1,4 @@
+base_config:
+  - testcfg/a.yaml
+a: 2
+e: 2
