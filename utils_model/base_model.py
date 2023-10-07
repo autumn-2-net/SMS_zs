@@ -1,3 +1,5 @@
+from typing import Dict
+from torchmetrics import Metric, MeanMetric
 import torch
 from lightning.pytorch.utilities.rank_zero import rank_zero_debug, rank_zero_info, rank_zero_only
 
@@ -29,7 +31,7 @@ class BaseTask(PL.LightningModule):
     def __init__(self,config, *args, **kwargs):
         # dataset configs
         super().__init__(*args, **kwargs)
-        self.model_config = config['model_arg']
+
         self.config=config
 
         #
@@ -78,17 +80,17 @@ class BaseTask(PL.LightningModule):
 
 
 
-    @staticmethod
-    def build_phone_encoder():
-        phone_list = build_phoneme_list()
-        return TokenTextEncoder(vocab_list=phone_list)
+    # @staticmethod
+    # def build_phone_encoder():
+    #     phone_list = build_phoneme_list()
+    #     return TokenTextEncoder(vocab_list=phone_list)
 
     def build_model(self):
         raise NotImplementedError()
 
-    @rank_zero_only
-    def print_arch(self):
-        utils.print_arch(self.model)
+    # @rank_zero_only
+    # def print_arch(self):
+    #     utils.print_arch(self.model)
 
     def build_losses_and_metrics(self):
         raise NotImplementedError()
@@ -125,7 +127,7 @@ class BaseTask(PL.LightningModule):
         self.log_dict(log_outputs, prog_bar=True, logger=False, on_step=True, on_epoch=False)
         self.log('lr', self.lr_schedulers().get_last_lr()[0], prog_bar=True, logger=False, on_step=True, on_epoch=False)
         # logs to tensorboard
-        if self.global_step % hparams['log_interval'] == 0:
+        if self.global_step % self.config['log_interval'] == 0:
             tb_log = {f'training/{k}': v for k, v in log_outputs.items()}
             tb_log['training/lr'] = self.lr_schedulers().get_last_lr()[0]
             self.logger.log_metrics(tb_log, step=self.global_step)
@@ -191,22 +193,22 @@ class BaseTask(PL.LightningModule):
 
     # noinspection PyMethodMayBeStatic
     def build_scheduler(self, optimizer):
-        from utils import build_lr_scheduler_from_config
+        from utils.cls_loader import build_lr_scheduler_from_config
 
-        scheduler_args = hparams['lr_scheduler_args']
+        scheduler_args = self.config['lr_scheduler_args']
         assert scheduler_args['scheduler_cls'] != ''
         scheduler = build_lr_scheduler_from_config(optimizer, scheduler_args)
         return scheduler
 
     # noinspection PyMethodMayBeStatic
     def build_optimizer(self, model):
-        from utils import build_object_from_class_name
+        from utils.cls_loader import build_object_from_class_name_opt
 
-        optimizer_args = hparams['optimizer_args']
+        optimizer_args = self.config['optimizer_args']
         assert optimizer_args['optimizer_cls'] != ''
         if 'beta1' in optimizer_args and 'beta2' in optimizer_args and 'betas' not in optimizer_args:
             optimizer_args['betas'] = (optimizer_args['beta1'], optimizer_args['beta2'])
-        optimizer = build_object_from_class_name(
+        optimizer = build_object_from_class_name_opt(
             optimizer_args['optimizer_cls'],
             torch.optim.Optimizer,
             model.parameters(),
@@ -215,7 +217,7 @@ class BaseTask(PL.LightningModule):
         return optimizer
 
     def configure_optimizers(self):
-        optm = self.build_optimizer(self.model)
+        optm = self.build_optimizer(self)
         scheduler = self.build_scheduler(optm)
         if scheduler is None:
             return optm
@@ -286,47 +288,47 @@ class BaseTask(PL.LightningModule):
     #     #     checkpoint['category'] = self.model.category
     #     checkpoint['trainer_stage'] = self.trainer.state.stage.value
 
-    # def on_load_checkpoint(self, checkpoint):
-    #     from lightning.pytorch.trainer.states import RunningStage
-    #     from utils import simulate_lr_scheduler
-    #     if checkpoint.get('trainer_stage', '') == RunningStage.VALIDATING.value:
-    #         self.skip_immediate_validation = True
-    #
-    #     optimizer_args = hparams['optimizer_args']
-    #     scheduler_args = hparams['lr_scheduler_args']
-    #
-    #     if 'beta1' in optimizer_args and 'beta2' in optimizer_args and 'betas' not in optimizer_args:
-    #         optimizer_args['betas'] = (optimizer_args['beta1'], optimizer_args['beta2'])
-    #
-    #     if checkpoint.get('optimizer_states', None):
-    #         opt_states = checkpoint['optimizer_states']
-    #         assert len(opt_states) == 1  # only support one optimizer
-    #         opt_state = opt_states[0]
-    #         for param_group in opt_state['param_groups']:
-    #             for k, v in optimizer_args.items():
-    #                 if k in param_group and param_group[k] != v:
-    #                     if 'lr_schedulers' in checkpoint and checkpoint['lr_schedulers'] and k == 'lr':
-    #                         continue
-    #                     rank_zero_info(f'| Overriding optimizer parameter {k} from checkpoint: {param_group[k]} -> {v}')
-    #                     param_group[k] = v
-    #             if 'initial_lr' in param_group and param_group['initial_lr'] != optimizer_args['lr']:
-    #                 rank_zero_info(
-    #                     f'| Overriding optimizer parameter initial_lr from checkpoint: {param_group["initial_lr"]} -> {optimizer_args["lr"]}'
-    #                 )
-    #                 param_group['initial_lr'] = optimizer_args['lr']
-    #
-    #     if checkpoint.get('lr_schedulers', None):
-    #         assert checkpoint.get('optimizer_states', False)
-    #         assert len(checkpoint['lr_schedulers']) == 1  # only support one scheduler
-    #         checkpoint['lr_schedulers'][0] = simulate_lr_scheduler(
-    #             optimizer_args, scheduler_args,
-    #             step_count=checkpoint['global_step'],
-    #             num_param_groups=len(checkpoint['optimizer_states'][0]['param_groups'])
-    #         )
-    #         for param_group, new_lr in zip(
-    #             checkpoint['optimizer_states'][0]['param_groups'],
-    #             checkpoint['lr_schedulers'][0]['_last_lr'],
-    #         ):
-    #             if param_group['lr'] != new_lr:
-    #                 rank_zero_info(f'| Overriding optimizer parameter lr from checkpoint: {param_group["lr"]} -> {new_lr}')
-    #                 param_group['lr'] = new_lr
+    def on_load_checkpoint(self, checkpoint):
+        from lightning.pytorch.trainer.states import RunningStage
+        from utils import simulate_lr_scheduler
+        if checkpoint.get('trainer_stage', '') == RunningStage.VALIDATING.value:
+            self.skip_immediate_validation = True
+
+        optimizer_args = hparams['optimizer_args']
+        scheduler_args = hparams['lr_scheduler_args']
+
+        if 'beta1' in optimizer_args and 'beta2' in optimizer_args and 'betas' not in optimizer_args:
+            optimizer_args['betas'] = (optimizer_args['beta1'], optimizer_args['beta2'])
+
+        if checkpoint.get('optimizer_states', None):
+            opt_states = checkpoint['optimizer_states']
+            assert len(opt_states) == 1  # only support one optimizer
+            opt_state = opt_states[0]
+            for param_group in opt_state['param_groups']:
+                for k, v in optimizer_args.items():
+                    if k in param_group and param_group[k] != v:
+                        if 'lr_schedulers' in checkpoint and checkpoint['lr_schedulers'] and k == 'lr':
+                            continue
+                        rank_zero_info(f'| Overriding optimizer parameter {k} from checkpoint: {param_group[k]} -> {v}')
+                        param_group[k] = v
+                if 'initial_lr' in param_group and param_group['initial_lr'] != optimizer_args['lr']:
+                    rank_zero_info(
+                        f'| Overriding optimizer parameter initial_lr from checkpoint: {param_group["initial_lr"]} -> {optimizer_args["lr"]}'
+                    )
+                    param_group['initial_lr'] = optimizer_args['lr']
+
+        if checkpoint.get('lr_schedulers', None):
+            assert checkpoint.get('optimizer_states', False)
+            assert len(checkpoint['lr_schedulers']) == 1  # only support one scheduler
+            checkpoint['lr_schedulers'][0] = simulate_lr_scheduler(
+                optimizer_args, scheduler_args,
+                step_count=checkpoint['global_step'],
+                num_param_groups=len(checkpoint['optimizer_states'][0]['param_groups'])
+            )
+            for param_group, new_lr in zip(
+                checkpoint['optimizer_states'][0]['param_groups'],
+                checkpoint['lr_schedulers'][0]['_last_lr'],
+            ):
+                if param_group['lr'] != new_lr:
+                    rank_zero_info(f'| Overriding optimizer parameter lr from checkpoint: {param_group["lr"]} -> {new_lr}')
+                    param_group['lr'] = new_lr
