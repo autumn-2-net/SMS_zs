@@ -1,34 +1,35 @@
+import torch
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset, DataLoader
 
 
 
 
-class SVS_Dataset:
-    def __init__(self, xs, ys):
-        self.xs = xs
-        self.ys = ys
+class TSVS_Dataset:
+    def __init__(self, ):
+        pass
+
 
     def __getitem__(self, i):
         # return self.xs[i[0]], self.ys[i[0]]
 
-        return self.xs[i], self.ys[i]
+        return f'svs{str(i)}'
 
     def __len__(self):
-        return len(self.xs)
+        return 10
 
-class SVC_Dataset:
-    def __init__(self, xs, ys):
-        self.xs = xs
-        self.ys = ys
+class TSVC_Dataset:
+    def __init__(self, ):
+        pass
+
 
     def __getitem__(self, i):
         # return self.xs[i[0]], self.ys[i[0]]
 
-        return self.xs[i], self.ys[i]
+        return f'svc{str(i)}'
 
     def __len__(self):
-        return len(self.xs)
+        return 50
 
 class MIX_Dataset(Dataset):
     def __init__(self, svs_data_set, svc_data_set):
@@ -53,7 +54,7 @@ class MIX_Dataset(Dataset):
     def get_child_data_set_num(self):
         return {'svs':self.num_for_svs,'svc':self.num_for_svc}
 
-class ssvv_ssvv_BatchSampler(Sampler):
+class ssvvsc_BatchSampler(Sampler):
     def __init__(self, dataset, batch_size,svs_batch_size=None,
                  num_replicas=None, rank=None,
 
@@ -70,6 +71,9 @@ class ssvv_ssvv_BatchSampler(Sampler):
 
 
         self.dataset = dataset
+        nums=self.dataset.get_child_data_set_num()
+        self.num_for_svs=nums['svs']
+        self.num_for_svc = nums['svc']
 
         self.batch_size = batch_size
 
@@ -81,5 +85,87 @@ class ssvv_ssvv_BatchSampler(Sampler):
         self.seed = seed
         self.drop_last = drop_last
         self.epoch = 0
-        self.batches = None
-        self.formed = None
+
+    def update_epoch(self):
+        self.epoch += 1
+
+
+
+    def build_batch(self):
+        svs_npad = self.num_for_svs %self.svs_batch_size
+        if svs_npad != 0:
+            svs_pad = self.svs_batch_size - svs_npad
+
+        svc_npad = self.num_for_svc %self.svc_batch_size
+        if svc_npad != 0:
+            svc_pad = self.svc_batch_size - svc_npad
+
+        if self.drop_last:
+            svs_bnum=self.num_for_svs //self.svs_batch_size
+            svc_bnum = self.num_for_svc //self.svc_batch_size
+        else:
+            svs_bnum=self.num_for_svs //self.svs_batch_size
+            svc_bnum = self.num_for_svc //self.svc_batch_size
+            if svs_npad != 0:
+                svs_bnum=svs_bnum+1
+            if svc_npad != 0:
+                svc_bnum=svc_bnum+1
+
+
+        batchlist=[]   # svc 数据前置
+
+        g = torch.Generator()
+        g.manual_seed(self.seed + self.epoch)
+        # indices = torch.randperm(len(self.dataset), generator=g).tolist()
+        if svs_bnum>svc_bnum:
+            svsidl=torch.randperm(self.num_for_svs, generator=g).tolist()
+            tpmlist=[]
+            tpmlist2 = []
+            if self.drop_last and svs_npad != 0:
+                svsidl=svsidl[:-svs_npad]
+            else:
+                if svs_npad != 0:
+                    svsidl = svsidl+torch.randperm(self.num_for_svs, generator=g).tolist()[:svs_pad]
+            sxcl=[]
+            for i in svsidl:
+                if len(sxcl) ==self.svs_batch_size:
+                    tpmlist.append(sxcl.copy())
+                    sxcl=[]
+                sxcl.append(i)
+            tpmlist.append(sxcl.copy())
+
+            svsblen=len(tpmlist)
+
+            svcnumitem=svsblen*self.svs_batch_size
+
+            itspad=svcnumitem%self.num_for_svc
+            itsnpad=self.num_for_svc-itspad
+            if itspad!=0:
+                svccpac=svcnumitem//self.num_for_svc +1
+            else:
+                svccpac = svcnumitem // self.num_for_svc
+
+            svcidl=[]
+
+            for i in range(svccpac):
+                svcidl=svcidl+(torch.randperm(self.num_for_svc, generator=g)+self.num_for_svs).tolist()
+
+            if itspad!=0:
+                svcidl=svcidl[:-itsnpad]
+            svc_ctpm=[]
+            for i in svcidl:
+                if len(svc_ctpm) == self.svc_batch_size:
+                    tpmlist2.append(svc_ctpm.copy())
+                    svc_ctpm = []
+                svc_ctpm.append(i)
+            tpmlist2.append(svc_ctpm.copy())
+
+            assert len(tpmlist)==len(tpmlist2)
+
+            for svcX,svsX in zip(tpmlist2,tpmlist2):
+                svcX:list
+                svsX:list
+                batchlist.append(svcX+svsX)
+
+
+
