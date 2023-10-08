@@ -5,6 +5,9 @@ from lightning.pytorch.utilities.rank_zero import rank_zero_debug, rank_zero_inf
 
 import lightning as PL
 
+from train_utils.ssvv_BatchSampler import ssvvsc_BatchSampler
+
+
 class BaseTask(PL.LightningModule):
     """
         Base class for training tasks.
@@ -231,10 +234,10 @@ class BaseTask(PL.LightningModule):
         }
 
     def train_dataloader(self):
-        self.training_sampler = DsBatchSampler(
+        self.training_sampler = ssvvsc_BatchSampler(
             self.train_dataset,
-            max_batch_frames=self.max_batch_frames,
-            max_batch_size=self.max_batch_size,
+
+
             num_replicas=(self.trainer.distributed_sampler_kwargs or {}).get('num_replicas', 1),
             rank=(self.trainer.distributed_sampler_kwargs or {}).get('rank', 0),
             sort_by_similar_size=hparams['sort_by_len'],
