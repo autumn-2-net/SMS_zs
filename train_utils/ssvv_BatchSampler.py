@@ -15,7 +15,7 @@ class TSVS_Dataset:
         return f'svs{str(i)}'
 
     def __len__(self):
-        return 20000000
+        return 200
 
 
 class TSVC_Dataset:
@@ -28,7 +28,7 @@ class TSVC_Dataset:
         return f'svc{str(i)}'
 
     def __len__(self):
-        return 3000000
+        return 150
 
 
 class MIX_Dataset(Dataset):
@@ -247,14 +247,20 @@ class ssvvsc_BatchSampler(Sampler):
                 svsX: list
                 batchlist.append(svcX + svsX)
         else:
-            svsidl = torch.randperm(self.num_for_svs, generator=g).tolist()
+            if self.shuffle :
+                svsidl = torch.randperm(self.num_for_svs, generator=g).tolist()
+            else:
+                svsidl = list(range(self.num_for_svs))
             tpmlist = []
             tpmlist2 = []
             if self.drop_last and svs_npad != 0:
                 svsidl = svsidl[:-svs_npad]
             else:
                 if svs_npad != 0:
-                    svsidl = svsidl + torch.randperm(self.num_for_svs, generator=g).tolist()[:svs_pad]
+                    if self.shuffle:
+                        svsidl = svsidl + torch.randperm(self.num_for_svs, generator=g).tolist()[:svs_pad]
+                    else:
+                        svsidl = svsidl + list(range(self.num_for_svs))[:svs_pad]
             sxcl = []
             for i in svsidl:
                 if len(sxcl) == self.svs_batch_size:
@@ -277,7 +283,10 @@ class ssvvsc_BatchSampler(Sampler):
             svcidl = []
 
             for i in range(svccpac):
-                svcidl = svcidl + (torch.randperm(self.num_for_svc, generator=g) + self.num_for_svs).tolist()
+                if self.shuffle:
+                    svcidl = svcidl + (torch.randperm(self.num_for_svc, generator=g) + self.num_for_svs).tolist()
+                else:
+                    svcidl = svcidl + (torch.tensor(list(range(self.num_for_svc))) + self.num_for_svs).tolist()
 
             if itspad != 0:
                 svcidl = svcidl[:-itsnpad]
@@ -327,34 +336,26 @@ class ssvvsc_BatchSampler(Sampler):
 
 
 class ssvvsc_BatchSampler_val(Sampler):
-    def __init__(self, dataset, batch_size, svs_batch_size=None,
+    def __init__(self, dataset,
                  num_replicas=None, rank=None,
 
-                 shuffle=False, seed=0, drop_last=False) -> None:
+                 ) -> None:
 
-        if svs_batch_size is None:
-            svs_batch_size = batch_size // 2
 
-        self.svs_batch_size = svs_batch_size
-        self.svc_batch_size = batch_size - svs_batch_size
-        assert svs_batch_size < batch_size
 
-        assert svs_batch_size > 0
+
 
         self.dataset = dataset
         nums = self.dataset.get_child_data_set_num()
         self.num_for_svs = nums['svs']
         self.num_for_svc = nums['svc']
 
-        self.batch_size = batch_size
 
         self.num_replicas = num_replicas
         self.rank = rank
 
-        self.shuffle = shuffle
 
-        self.seed = seed
-        self.drop_last = drop_last
+
         self.epoch = 0
         self.bls=[]
         for i in range(len(self.dataset)):
@@ -402,7 +403,7 @@ if __name__ == '__main__':
                                       batch_sampler=ssvvsc_BatchSampler(mixd, batch_size=5, svs_batch_size=2,
                                                                         num_replicas=1, rank=None,
 
-                                                                        shuffle=False, seed=0, drop_last=False),
+                                                                        shuffle=True, seed=0, drop_last=False),
                                       # num_workers=hparams['ds_workers'],
                                       # prefetch_factor=hparams['dataloader_prefetch_factor'],
                                       # pin_memory=True,
@@ -411,15 +412,15 @@ if __name__ == '__main__':
                                       )
 
     for i in tqdm(ddl):
-        # print(i)
+        print(i)
         pass
     print('\n')
-    ddl.batch_sampler.update_epoch()
+    ddl.batch_sampler.update_epoch(2)
     for i in tqdm(ddl):
         # print(i)
         pass
     print('\n')
-    ddl.batch_sampler.update_epoch()
+    ddl.batch_sampler.update_epoch(3)
     for i in tqdm(ddl):
         # print(i)
         pass

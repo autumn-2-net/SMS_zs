@@ -5,7 +5,7 @@ from lightning.pytorch.utilities.rank_zero import rank_zero_debug, rank_zero_inf
 
 import lightning as PL
 
-from train_utils.ssvv_BatchSampler import ssvvsc_BatchSampler
+from train_utils.ssvv_BatchSampler import ssvvsc_BatchSampler, ssvvsc_BatchSampler_val
 
 
 class BaseTask(PL.LightningModule):
@@ -240,33 +240,31 @@ class BaseTask(PL.LightningModule):
 
             num_replicas=(self.trainer.distributed_sampler_kwargs or {}).get('num_replicas', 1),
             rank=(self.trainer.distributed_sampler_kwargs or {}).get('rank', 0),
-            sort_by_similar_size=hparams['sort_by_len'],
-            required_batch_count_multiple=hparams['accumulate_grad_batches'],
-            shuffle_sample=True,
-            shuffle_batch=False,
-            seed=hparams['seed']
+
+            shuffle=True,
+
+            seed=self.config['seed'],drop_last=False
         )
         return torch.utils.data.DataLoader(self.train_dataset,
                                            collate_fn=self.train_dataset.collater,
                                            batch_sampler=self.training_sampler,
-                                           num_workers=hparams['ds_workers'],
-                                           prefetch_factor=hparams['dataloader_prefetch_factor'],
+                                           num_workers=self.config['DL_workers'],
+                                           prefetch_factor=self.config['dataloader_prefetch_factor'],
                                            pin_memory=True,
                                            persistent_workers=True)
 
     def val_dataloader(self):
-        sampler = DsEvalBatchSampler(
+        sampler = ssvvsc_BatchSampler_val(
             self.valid_dataset,
-            max_batch_frames=self.max_val_batch_frames,
-            max_batch_size=self.max_val_batch_size,
+
             rank=(self.trainer.distributed_sampler_kwargs or {}).get('rank', 0),
-            batch_by_size=False
+
         )
         return torch.utils.data.DataLoader(self.valid_dataset,
                                            collate_fn=self.valid_dataset.collater,
                                            batch_sampler=sampler,
-                                           num_workers=hparams['ds_workers'],
-                                           prefetch_factor=hparams['dataloader_prefetch_factor'],
+                                           num_workers=self.config['DL_workers_val'],
+                                           prefetch_factor=self.config['dataloader_prefetch_factor'],
                                            shuffle=False)
 
     # def test_dataloader(self):
@@ -291,47 +289,47 @@ class BaseTask(PL.LightningModule):
     #     #     checkpoint['category'] = self.model.category
     #     checkpoint['trainer_stage'] = self.trainer.state.stage.value
 
-    def on_load_checkpoint(self, checkpoint):
-        from lightning.pytorch.trainer.states import RunningStage
-        from utils import simulate_lr_scheduler
-        if checkpoint.get('trainer_stage', '') == RunningStage.VALIDATING.value:
-            self.skip_immediate_validation = True
-
-        optimizer_args = hparams['optimizer_args']
-        scheduler_args = hparams['lr_scheduler_args']
-
-        if 'beta1' in optimizer_args and 'beta2' in optimizer_args and 'betas' not in optimizer_args:
-            optimizer_args['betas'] = (optimizer_args['beta1'], optimizer_args['beta2'])
-
-        if checkpoint.get('optimizer_states', None):
-            opt_states = checkpoint['optimizer_states']
-            assert len(opt_states) == 1  # only support one optimizer
-            opt_state = opt_states[0]
-            for param_group in opt_state['param_groups']:
-                for k, v in optimizer_args.items():
-                    if k in param_group and param_group[k] != v:
-                        if 'lr_schedulers' in checkpoint and checkpoint['lr_schedulers'] and k == 'lr':
-                            continue
-                        rank_zero_info(f'| Overriding optimizer parameter {k} from checkpoint: {param_group[k]} -> {v}')
-                        param_group[k] = v
-                if 'initial_lr' in param_group and param_group['initial_lr'] != optimizer_args['lr']:
-                    rank_zero_info(
-                        f'| Overriding optimizer parameter initial_lr from checkpoint: {param_group["initial_lr"]} -> {optimizer_args["lr"]}'
-                    )
-                    param_group['initial_lr'] = optimizer_args['lr']
-
-        if checkpoint.get('lr_schedulers', None):
-            assert checkpoint.get('optimizer_states', False)
-            assert len(checkpoint['lr_schedulers']) == 1  # only support one scheduler
-            checkpoint['lr_schedulers'][0] = simulate_lr_scheduler(
-                optimizer_args, scheduler_args,
-                step_count=checkpoint['global_step'],
-                num_param_groups=len(checkpoint['optimizer_states'][0]['param_groups'])
-            )
-            for param_group, new_lr in zip(
-                checkpoint['optimizer_states'][0]['param_groups'],
-                checkpoint['lr_schedulers'][0]['_last_lr'],
-            ):
-                if param_group['lr'] != new_lr:
-                    rank_zero_info(f'| Overriding optimizer parameter lr from checkpoint: {param_group["lr"]} -> {new_lr}')
-                    param_group['lr'] = new_lr
+    # def on_load_checkpoint(self, checkpoint):
+    #     from lightning.pytorch.trainer.states import RunningStage
+    #     from utils import simulate_lr_scheduler
+    #     if checkpoint.get('trainer_stage', '') == RunningStage.VALIDATING.value:
+    #         self.skip_immediate_validation = True
+    #
+    #     optimizer_args = hparams['optimizer_args']
+    #     scheduler_args = hparams['lr_scheduler_args']
+    #
+    #     if 'beta1' in optimizer_args and 'beta2' in optimizer_args and 'betas' not in optimizer_args:
+    #         optimizer_args['betas'] = (optimizer_args['beta1'], optimizer_args['beta2'])
+    #
+    #     if checkpoint.get('optimizer_states', None):
+    #         opt_states = checkpoint['optimizer_states']
+    #         assert len(opt_states) == 1  # only support one optimizer
+    #         opt_state = opt_states[0]
+    #         for param_group in opt_state['param_groups']:
+    #             for k, v in optimizer_args.items():
+    #                 if k in param_group and param_group[k] != v:
+    #                     if 'lr_schedulers' in checkpoint and checkpoint['lr_schedulers'] and k == 'lr':
+    #                         continue
+    #                     rank_zero_info(f'| Overriding optimizer parameter {k} from checkpoint: {param_group[k]} -> {v}')
+    #                     param_group[k] = v
+    #             if 'initial_lr' in param_group and param_group['initial_lr'] != optimizer_args['lr']:
+    #                 rank_zero_info(
+    #                     f'| Overriding optimizer parameter initial_lr from checkpoint: {param_group["initial_lr"]} -> {optimizer_args["lr"]}'
+    #                 )
+    #                 param_group['initial_lr'] = optimizer_args['lr']
+    #
+    #     if checkpoint.get('lr_schedulers', None):
+    #         assert checkpoint.get('optimizer_states', False)
+    #         assert len(checkpoint['lr_schedulers']) == 1  # only support one scheduler
+    #         checkpoint['lr_schedulers'][0] = simulate_lr_scheduler(
+    #             optimizer_args, scheduler_args,
+    #             step_count=checkpoint['global_step'],
+    #             num_param_groups=len(checkpoint['optimizer_states'][0]['param_groups'])
+    #         )
+    #         for param_group, new_lr in zip(
+    #             checkpoint['optimizer_states'][0]['param_groups'],
+    #             checkpoint['lr_schedulers'][0]['_last_lr'],
+    #         ):
+    #             if param_group['lr'] != new_lr:
+    #                 rank_zero_info(f'| Overriding optimizer parameter lr from checkpoint: {param_group["lr"]} -> {new_lr}')
+    #                 param_group['lr'] = new_lr
