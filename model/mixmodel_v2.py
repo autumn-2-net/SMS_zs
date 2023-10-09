@@ -29,10 +29,10 @@ class ssvm(nn.Module):
         self.svcin=nn.Linear(768,config['fs2_hidden_size'])
 
 
-        self.taskemb=nn.Embedding(2,config['mixenvc_hidden_size'])
+        self.taskemb=nn.Embedding(2,config['fs2_hidden_size'])
 
         self.pitch_embed = nn.Linear(1, config['fs2_hidden_size'])  ###############
-        self.mixencoder=mixecn(indim=config['fs2_hidden_size'],outdim=config['condition_dim'],dim=config['mixenvc_hidden_size'],lays=config['mixenvc_lays'], heads=config['mixenvc_heads'], dim_head=config['mixenvc_dim_head'],hideen_dim=config.get('mixenvc_latent_dim'),)
+        self.mixencoder=mixecn(indim=config['fs2_hidden_size'],outdim=config['fs2_hidden_size'],dim=config['mixenvc_hidden_size'],lays=config['mixenvc_lays'], heads=config['mixenvc_heads'], dim_head=config['mixenvc_dim_head'],hideen_dim=config.get('mixenvc_latent_dim'),)
 
 
         self.fs2=fastspeech2(vocab_size=vocab_size,config=config)
@@ -57,27 +57,24 @@ class ssvm(nn.Module):
             mask=torch.cat([svsmask,svcmask],dim=0)
             svsc = self.forwardsvs(txt_tokens=txt_tokens, mel2ph=mel2ph, key_shift=key_shift, speed=speed, kwargs=kwargs)
             svcc=self.forwardsvc(cvec_feature)
-            f0_mel = (1 + f0 / 700).log()
-            pitch_embed = self.pitch_embed(f0_mel[:, :, None])
-            condition = self.mixencoder(torch.cat([svsc,svcc],dim=0)+pitch_embed, taskemb=self.taskemb(tasktype), mask=mask)
+
+            condition = torch.cat([svsc,svcc])+self.taskemb(tasktype)[:, None, :]
         elif svsu:
             mask=svsmask
             svsc=self.forwardsvs(txt_tokens=txt_tokens,mel2ph=mel2ph,key_shift=key_shift,speed=speed,kwargs=kwargs)
-            f0_mel = (1 + f0 / 700).log()
-            pitch_embed = self.pitch_embed(f0_mel[:, :, None])
-            condition = self.mixencoder(svsc+pitch_embed, taskemb=self.taskemb(tasktype), mask=svsmask)
+
+            condition = svsc+self.taskemb(tasktype)[:, None, :]
 
         elif svcu:
             mask=svcmask
             svcc=self.forwardsvc(cvec_feature)
-            f0_mel = (1 + f0 / 700).log()
-            pitch_embed = self.pitch_embed(f0_mel[:, :, None])
 
-            condition=self.mixencoder(svcc+pitch_embed,taskemb=self.taskemb(tasktype),mask=svcmask)
 
-        # f0_mel = (1 + f0 / 700).log()
-        # pitch_embed = self.pitch_embed(f0_mel[:, :, None])
-        # condition=condition+pitch_embed
+            condition=svcc+self.taskemb(tasktype)[:, None, :]
+
+        f0_mel = (1 + f0 / 700).log()
+        pitch_embed = self.pitch_embed(f0_mel[:, :, None])
+        condition=condition+pitch_embed
 
         if infer:
 
@@ -97,4 +94,4 @@ class ssvm(nn.Module):
            **kwargs)
     def forwardsvc(self,feature):
         # torch
-        return self.svcin(feature.transpose(1,2))
+        return self.mixencoder(self.svcin(feature.transpose(1,2)))

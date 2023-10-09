@@ -4,11 +4,12 @@ from lightning.pytorch.loggers import TensorBoardLogger
 
 from PL_callbacks.save_checkpoint import ModelCheckpoints
 from utils.config_loader import get_config
-from utils_model.ssvc import ssvc
+# from utils_model.ssvc import ssvc
+from utils_model.ssvc_v2 import ssvc
 import lightning as pl
 
 
-config=get_config('configs/a.yaml')
+config=get_config('configs/a_v2.yaml')
 # config=get_config('configs/a1.yaml')
 config.update({'infer':False})
 
@@ -17,7 +18,7 @@ models_ssvc.build_losses_and_metrics()
 
 
 # work_dir = pathlib.Path(config['base_work_dir'])/'testckpt'
-work_dir = pathlib.Path(config['base_work_dir'])/'largex_v2'
+work_dir = pathlib.Path(config['base_work_dir'])/'largex_v4'
 
 if __name__ == '__main__':
     trainer = pl.Trainer(
