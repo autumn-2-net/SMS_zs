@@ -17,7 +17,7 @@ models_ssvc.build_losses_and_metrics()
 
 
 # work_dir = pathlib.Path(config['base_work_dir'])/'testckpt'
-work_dir = pathlib.Path(config['base_work_dir'])/'largex'
+work_dir = pathlib.Path(config['base_work_dir'])/'largex_v2'
 
 if __name__ == '__main__':
     trainer = pl.Trainer(
