@@ -9,13 +9,15 @@ import lightning as pl
 
 
 config=get_config('configs/a.yaml')
+# config=get_config('configs/a1.yaml')
 config.update({'infer':False})
 
 models_ssvc=ssvc(config=config)
 models_ssvc.build_losses_and_metrics()
 
 
-work_dir = pathlib.Path(config['base_work_dir'])/'testckpt'
+# work_dir = pathlib.Path(config['base_work_dir'])/'testckpt'
+work_dir = pathlib.Path(config['base_work_dir'])/'largex'
 
 if __name__ == '__main__':
     trainer = pl.Trainer(
@@ -56,5 +58,5 @@ if __name__ == '__main__':
         num_sanity_val_steps=config['num_sanity_val_steps'],
         accumulate_grad_batches=config['accumulate_grad_batches']
     )
-    trainer.fit(models_ssvc,ckpt_path=r'D:\propj\sum_a\ckpt\testckpt\model_ckpt_steps_8002.ckpt' #ckpt_path=get_latest_checkpoint_path(work_dir)
+    trainer.fit(models_ssvc,#ckpt_path=r'D:\propj\sum_a\ckpt\testckpt\model_ckpt_steps_8002.ckpt' #ckpt_path=get_latest_checkpoint_path(work_dir)
                 )
