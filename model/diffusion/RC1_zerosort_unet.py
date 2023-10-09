@@ -436,10 +436,11 @@ class SinusoidalPosEmb(nn.Module):
 
 
 class RC1_unet(nn.Module):
-    def __init__(self, in_dims, n_feats, *, n_layers=20, n_chans=256, n_dilates=4):
+    def __init__(self, in_dims, n_feats, *, n_layers=20, n_chans=256, n_dilates=4,**key):
         super().__init__()
-        self.in_dims = in_dims
-        self.n_feats = n_feats
+        self.in_dims = 1
+        self.n_feats = 1
+        n_chans = 256
         self.unet = unetb()
         self.pmencod=promet_encoder(256,128,512)
         self.attpool=AttentionPool(512,heads=8, dim_head=64,)

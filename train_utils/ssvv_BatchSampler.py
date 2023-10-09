@@ -91,7 +91,7 @@ class ssvvsc_BatchSampler(Sampler):
         # print(t2-t1)
         self.blsn = len(self.bls)
 
-    def update_epoch(self,btch):
+    def set_epoch(self,btch):
         self.epoch =btch
 
     # def listcut(self,Llist)->list:
@@ -364,7 +364,7 @@ class ssvvsc_BatchSampler_val(Sampler):
 
         self.blsn = len(self.bls)
 
-    def update_epoch(self,btch):
+    def set_epoch(self,btch):
         self.epoch =btch
 
     # def listcut(self,Llist)->list:

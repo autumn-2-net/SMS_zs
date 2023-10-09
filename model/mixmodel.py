@@ -37,7 +37,7 @@ class ssvm(nn.Module):
 
         self.fs2=fastspeech2(vocab_size=vocab_size,config=config)
 
-        self.diffusion = GaussianDiffusion(
+        self.diffusion = GaussianDiffusion(config=config,
             out_dims=config['audio_num_mel_bins'],
             num_feats=1,
             timesteps=config['timesteps'],
@@ -76,16 +76,18 @@ class ssvm(nn.Module):
 
 
             mel_pred = self.diffusion(condition, src_spec=None,promot=promot, infer=True)
-            mel_pred *= mask.float()[:, :, None]
+            if mask is not None:
+                mel_pred *= mask.float()[:, :, None]
             return mel_pred
         else:
 
             x_recon, noise = self.diffusion(condition, gt_spec=gt_mel,promot=promot, infer=False)
-            return x_recon, noise
+            return x_recon, noise,mask
 
 
     def forwardsvs(self,txt_tokens,mel2ph,key_shift,speed,kwargs):
         return self.fs2(txt_tokens=txt_tokens,mel2ph=mel2ph,  key_shift=key_shift, speed=speed,
            **kwargs)
     def forwardsvc(self,feature):
-        return self.svcin(feature)
+        # torch
+        return self.svcin(feature.transpose(1,2))

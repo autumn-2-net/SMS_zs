@@ -10,17 +10,18 @@ import torch
 from torch import nn
 from tqdm import tqdm
 
+from model.diffusion.RC1_zerosort_unet import RC1_unet
 
-from modules.diffusion.RC1_zerosort_unet import RC1_unet
+# from modules.diffusion.RC1_zerosort_unet import RC1_unet
 
-from modules.diffusion.unet2sa_natt_halfd import UnetXa_V
-
-from modules.diffusion.wavenet import WaveNet
+# from modules.diffusion.unet2sa_natt_halfd import UnetXa_V
+#
+# from modules.diffusion.wavenet import WaveNet
 
 # from utils.hparams import hparams
 
 DIFF_DENOISERS = {
-    'wavenet': WaveNet, 'RC1_unet': RC1_unet, 'UnetXa_V': UnetXa_V
+ 'RC1_unet': RC1_unet,
 }
 
 

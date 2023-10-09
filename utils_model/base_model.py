@@ -57,6 +57,7 @@ class BaseTask(PL.LightningModule):
             'total_loss': MeanMetric()
         }
         self.valid_metric_names = set()
+        self.ssx = 0
 
     ###########
     # Training, validation and testing
@@ -88,8 +89,8 @@ class BaseTask(PL.LightningModule):
     #     phone_list = build_phoneme_list()
     #     return TokenTextEncoder(vocab_list=phone_list)
 
-    def build_model(self):
-        raise NotImplementedError()
+    # def build_model(self):
+    #     raise NotImplementedError()
 
     # @rank_zero_only
     # def print_arch(self):
@@ -121,7 +122,7 @@ class BaseTask(PL.LightningModule):
         """
         losses = self.run_model(sample)
         total_loss = sum(losses.values())
-        return total_loss, {**losses, 'batch_size': float(sample['size'])}
+        return total_loss, {**losses, 'step':int(self.global_step)}
 
     def training_step(self, sample, batch_idx, optimizer_idx=-1):
         total_loss, log_outputs = self._training_step(sample)
@@ -164,6 +165,10 @@ class BaseTask(PL.LightningModule):
         :param sample:
         :param batch_idx:
         """
+        if self.ssx ==0 and self.global_step!=0:
+            self.skip_immediate_validation=True
+            self.ssx=1
+
         if self.skip_immediate_validation:
             rank_zero_debug(f"Skip validation {batch_idx}")
             return {}
@@ -233,9 +238,10 @@ class BaseTask(PL.LightningModule):
             }
         }
 
+
     def train_dataloader(self):
         self.training_sampler = ssvvsc_BatchSampler(
-            self.train_dataset,
+            self.train_dataset, batch_size=self.config['batch_size'], svs_batch_size=self.config['svs_batch_size'],
 
 
             num_replicas=(self.trainer.distributed_sampler_kwargs or {}).get('num_replicas', 1),
@@ -245,8 +251,10 @@ class BaseTask(PL.LightningModule):
 
             seed=self.config['seed'],drop_last=False
         )
+        # self.train_dataset_collates=collates
+        # self.valid_dataset_collates = collates
         return torch.utils.data.DataLoader(self.train_dataset,
-                                           collate_fn=self.train_dataset.collater,
+                                           collate_fn=self.train_dataset_collates,
                                            batch_sampler=self.training_sampler,
                                            num_workers=self.config['DL_workers'],
                                            prefetch_factor=self.config['dataloader_prefetch_factor'],
@@ -261,7 +269,7 @@ class BaseTask(PL.LightningModule):
 
         )
         return torch.utils.data.DataLoader(self.valid_dataset,
-                                           collate_fn=self.valid_dataset.collater,
+                                           collate_fn=self.valid_dataset_collates ,
                                            batch_sampler=sampler,
                                            num_workers=self.config['DL_workers_val'],
                                            prefetch_factor=self.config['dataloader_prefetch_factor'],
