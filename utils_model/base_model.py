@@ -168,6 +168,8 @@ class BaseTask(PL.LightningModule):
         if self.ssx ==0 and self.global_step!=0:
             self.skip_immediate_validation=True
             self.ssx=1
+        if self.global_step==0:
+            self.ssx = 1
 
         if self.skip_immediate_validation:
             rank_zero_debug(f"Skip validation {batch_idx}")

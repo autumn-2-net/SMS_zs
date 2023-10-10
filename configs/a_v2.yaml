@@ -73,7 +73,7 @@ clip_grad_norm: 1
 
 
 
-val_check_interval: 4000
+val_check_interval: 6000
 
 num_sanity_val_steps: 1
 
@@ -129,6 +129,6 @@ permanent_ckpt_interval: 80000
 num_valid_plots: 15
 pndm_speedup: 10
 
-svs_batch_size: 3
-batch_size: 6
+svs_batch_size: 4
+batch_size: 7
 accumulate_grad_batches: 1
