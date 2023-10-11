@@ -7,6 +7,7 @@ import torchaudio
 
 from utils.data_orgmelE import wav2spec
 
+
 model=None
 def set_cvec(paths,cudas=True):
     global model
@@ -45,6 +46,7 @@ if __name__=='__main__':
     import glob
     import torchaudio
     from tqdm import tqdm
+    from utils.f0E import get_f0
 
     set_cvec(r'D:\propj\sum_a\content-vec-best-legacy-500.pt')
     # from concurrent.futures import ProcessPoolExecutor
@@ -56,16 +58,21 @@ if __name__=='__main__':
     # is_main_process = not bool(re.match(r'((.*Process)|(SyncManager)|(.*PoolWorker))-\d+', current_process().name))
     torch.set_num_threads(4)
 
-    lll = glob.glob(r'D:\propj\Disa\data\opencpop\raw\wavs/**.wav')
-    torch.set_num_threads(1)
+    lll = glob.glob(r'C:\Users\autumn\Desktop\qiong_data\zh\wav1/**.wav')
+    # torch.set_num_threads(1)
     lll=lll
     ooo=[]
-    oos=r'D:\propj\sum_a\datass'
-
+    oos=r'C:\Users\autumn\Desktop\qiong_data\zh\ft'
+    eeee=''
     for i in tqdm(lll):
         # print(i)
         nmm=i.split('\\')[-1]
-        ooo.append(fr'{i},D:\propj\sum_a\datass/{nmm}.npy')
+
+        f0,uv=get_f0(i,44100,'parselmouth',f0_min=40,f0_max=1600,hop_length=512,)
+        if f0 is None:
+            print('succss_skip')
+            continue
+        ooo.append(fr'{i},C:\Users\autumn\Desktop\qiong_data\zh\ft/{nmm}.npy')
         audio, sr = torchaudio.load(i)
         audio = torch.clamp(audio[0], -1.0, 1.0)
         config={"audio_sample_rate":44100}
@@ -79,7 +86,10 @@ if __name__=='__main__':
 
         xxxxx = \
         torch.nn.functional.interpolate(fff, size=len(sp), scale_factor=None, mode='nearest', align_corners=None)[0]
-        np.save(f'D:\propj\sum_a\datass/{nmm}.npy', xxxxx.detach().cpu().numpy())
+        np.save(fr'C:\Users\autumn\Desktop\qiong_data\zh\ft/{nmm}.npy', xxxxx.detach().cpu().numpy())
 
     for i in ooo:
         print(i)
+        eeee=eeee+i+'\n'
+    with open('cpt.txt','w',encoding='utf8') as f:
+        f.write(eeee)

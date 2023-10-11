@@ -3,8 +3,8 @@ import random
 
 import numpy as np
 
-from model.mixmodel_v3 import ssvm
-from train_utils.Tdataset import SVS_Dataset, SVC_Dataset
+from model.mixmodel_v2_waug import ssvm
+from train_utils.Tdataset_aug import SVS_Dataset, SVC_Dataset
 from train_utils.ssvv_BatchSampler import MIX_Dataset
 from utils_model.base_model import BaseTask
 import torch
@@ -48,7 +48,7 @@ def collates(minibatch):
         datx = {}
 
         for j in i:
-            if j not in ['tasktype', 'ph_idx', 'datal', 'promot']:
+            if j not in ['tasktype', 'ph_idx', 'datal', 'promot','key_shift']:
 
                 if j in ['gtmel']:
                     d = torch.tensor(i[j])
@@ -70,6 +70,8 @@ def collates(minibatch):
                 datx[j] = d
             if j == 'tasktype':
                 datx[j] = torch.tensor(i[j])
+            if j == 'key_shift':
+                datx[j] = torch.tensor(i[j]).unsqueeze(0)
         datx['mask'] = torch.tensor([True for _ in range(i['datal'])] + [False for _ in range(pads)])
         svsd1.append(datx)
 
@@ -213,7 +215,9 @@ def collates_val(minibatch):
             if j=='feature' and i['type']=='svc':
                 xxx['cvec_feature'] = torch.tensor(i[j]).unsqueeze(0)
                 continue
-
+            if j=='key_shift' :
+                xxx[j] = torch.tensor(i[j]).unsqueeze(0).unsqueeze(0)
+                continue
             xxx[j]=torch.tensor(i[j]).unsqueeze(0)
     return xxx
 
@@ -259,7 +263,10 @@ class DiffusionNoiseLoss(nn.Module):
         :param noise: [B, 1, M, T]
         :param nonpadding: [B, T, M]
         """
+
+        # cpx=x_recon.detach().cpu().float().numpy()
         x_recon, noise = self._mask_nonpadding(x_recon, noise, nonpadding)
+        # cpx2 = x_recon.detach().cpu().float().numpy()
         return self._forward(x_recon, noise).mean()
 
 def spec_to_figure(spec, vmin=None, vmax=None):
@@ -305,7 +312,7 @@ class ssvc(BaseTask):
         self.logged_gt_wav = set()
 
 
-        self.train_dataset=MIX_Dataset(svs_data_set=SVS_Dataset(paths =str(pathlib.Path(config['data_index_path'])/'train_svs'),config=config,vocab_list=vbc),svc_data_set=SVC_Dataset(paths =str(pathlib.Path(config['data_index_path'])/'train_svc'),config=config))
+        self.train_dataset=MIX_Dataset(svs_data_set=SVS_Dataset(paths =str(pathlib.Path(config['data_index_path'])/'train_svs'),config=config,vocab_list=vbc,key_aug=0.75),svc_data_set=SVC_Dataset(paths =str(pathlib.Path(config['data_index_path'])/'train_svc'),config=config))
         self.valid_dataset=MIX_Dataset(svs_data_set=SVS_Dataset(paths =str(pathlib.Path(config['data_index_path'])/'val_svs') ,config=config,vocab_list=vbc),svc_data_set=SVC_Dataset(paths =str(pathlib.Path(config['data_index_path'])/'val_svc'),config=config))
         self.train_dataset_collates=collates
         self.valid_dataset_collates = collates_val
@@ -367,10 +374,10 @@ class ssvc(BaseTask):
             #     losses['aux_mel_loss'] = aux_mel_loss
 
 
-            x_recon, x_noise,mask ,fs2lll= output
+            x_recon, x_noise,mask = output
             mel_loss = self.mel_loss(x_recon, x_noise, nonpadding=mask)
             losses['mel_loss'] = mel_loss
-            # losses['fs2lll'] = fs2lll
+
             return losses
 
     # def on_train_start(self):
