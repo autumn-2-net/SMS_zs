@@ -13,27 +13,34 @@ svcdata_paths: []
 
 
 DL_workers_val: 2
-DL_workers: 7
-dataloader_prefetch_factor: 6
+DL_workers: 6
+dataloader_prefetch_factor: 4
 
 optimizer_args:
   optimizer_cls: torch.optim.AdamW
-  lr: 0.000125
+  lr: 0.0004
+
+#  lr: 0.000125
   beta1: 0.9
   beta2: 0.98
   weight_decay: 0
 
-#lr_scheduler_args:
-#  scheduler_cls: torch.optim.lr_scheduler.StepLR
-#  step_size: 50000
-#  gamma: 0.5
+lr_scheduler_args:
+  scheduler_cls: torch.optim.lr_scheduler.StepLR
+  step_size: 50000
+  gamma: 0.5
 
 #optimizer_args:
 #  lr: 0.0001
-lr_scheduler_args:
-  scheduler_cls: lr_scheduler.scheduler.WarmupLR
-  warmup_steps: 10000
-  min_lr: 0.00001
+#lr_scheduler_args:
+#  scheduler_cls: lr_scheduler.scheduler.WarmupLR
+#  warmup_steps: 5000
+#  min_lr: 0.00004
+
+#lr_scheduler_args:
+#  scheduler_cls: lr_scheduler.scheduler.WarmupLR
+#  warmup_steps: 1000
+#  min_lr: 0.00001
 
 log_interval: 50
 
@@ -73,11 +80,11 @@ clip_grad_norm: 1
 
 
 
-val_check_interval: 8000
+val_check_interval: 4000
 
 num_sanity_val_steps: 1
 
-max_updates: 3200000
+max_updates: 1000000
 
 base_work_dir: ckpt/
 
@@ -111,7 +118,7 @@ mel_vmin: -6. #-6.
 mel_vmax: 1.5
 interp_uv: true
 
-fs2_lays: 5
+fs2_lays: 4
 fs2_heads: 4
 fs2_dim_head: 64
 fs2_kernel_size: 9
@@ -126,9 +133,9 @@ data_index_path: datax/
 num_ckpt_keep: 4
 permanent_ckpt_start: 200000
 permanent_ckpt_interval: 80000
-num_valid_plots: 30
+num_valid_plots: 7
 pndm_speedup: 10
 
-svs_batch_size: 4
-batch_size: 7
+svs_batch_size: 9
+batch_size: 10
 accumulate_grad_batches: 1

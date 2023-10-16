@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 
-from model.mixmodel_v2_waug_v2 import ssvm
+from model.mixmodel_v2_waug_v2_svso import ssvm
 from train_utils.Tdataset_aug import SVS_Dataset, SVC_Dataset
 from train_utils.ssvv_BatchSampler import MIX_Dataset
 from utils_model.base_model import BaseTask
@@ -250,7 +250,9 @@ class DiffusionNoiseLoss(nn.Module):
         if nonpadding is not None:
             # nonpadding = nonpadding.transpose(1, 2).unsqueeze(1)
 
-            return x_recon.masked_fill(~nonpadding.unsqueeze(1).unsqueeze(1), 0), noise.masked_fill(~nonpadding.unsqueeze(1).unsqueeze(1), 0)
+            # return x_recon.masked_fill(~nonpadding.unsqueeze(1).unsqueeze(1), 0), noise.masked_fill(~nonpadding.unsqueeze(1).unsqueeze(1), 0)
+            return x_recon.masked_fill(~nonpadding.unsqueeze(1), 0), noise.masked_fill(
+            ~nonpadding.unsqueeze(1), 0)
         else:
             return x_recon, noise
 
@@ -332,60 +334,6 @@ class ssvc(BaseTask):
 
         txt_tokens = sample.get('ph_idx')  # [B, T_ph]
         target = sample['gtmel']  # [B, T_s, M]
-        mel2ph = sample.get('mel2ph' ) # [B, T_s]
-        f0 = sample['f0']
-        promot = sample['promot']
-        variances = {
-            v_name: sample[v_name]
-            for v_name in self.required_variances
-        }
-        key_shift = sample.get('key_shift')
-        speed = sample.get('speed')
-        tasktype=sample['tasktype']
-        svsmask = sample.get('svsmask')
-        svcmask = sample.get('svcmask')
-        cvec_feature = sample.get('cvec_feature')
-
-
-        # if self.config['use_spk_id']:
-        #     spk_embed_id = sample['spk_ids']
-        # else:
-        # spk_embed_id = None
-        # output = self.model(
-        #     txt_tokens, mel2ph=mel2ph, f0=f0, promot=promot, **variances,
-        #     key_shift=key_shift, speed=speed, spk_embed_id=spk_embed_id,
-        #     gt_mel=target, infer=infer
-        # )
-
-        output = self.model(
-            promot=promot, f0=f0, tasktype=tasktype, svsmask=svsmask, svcmask=svcmask, txt_tokens=txt_tokens, mel2ph=mel2ph,
-            cvec_feature=cvec_feature, key_shift=key_shift, speed=speed,
-            gt_mel=target, infer=infer, **variances
-        )
-
-        if infer:
-            return output
-        else:
-            losses = {}
-
-            # if output.aux_out is not None:
-            #     aux_out = output.aux_out
-            #     aux_mel_loss = self.lambda_aux_mel_loss * self.aux_mel_loss(aux_out, target)
-            #     losses['aux_mel_loss'] = aux_mel_loss
-
-
-            x_recon, x_noise,mask = output
-            mel_loss = self.mel_loss(x_recon, x_noise, nonpadding=mask)
-            losses['mel_loss'] = mel_loss
-
-            return losses
-
-    def run_modelI(self, sample, infer=False):
-        #
-        # testdl=self.train_dataloader()
-
-        txt_tokens = sample.get('ph_idx')  # [B, T_ph]
-        target = None # [B, T_s, M]
         mel2ph = sample.get('mel2ph' ) # [B, T_s]
         f0 = sample['f0']
         promot = sample['promot']

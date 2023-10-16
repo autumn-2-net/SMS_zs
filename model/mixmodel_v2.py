@@ -58,19 +58,19 @@ class ssvm(nn.Module):
             svsc = self.forwardsvs(txt_tokens=txt_tokens, mel2ph=mel2ph, key_shift=key_shift, speed=speed, kwargs=kwargs)
             svcc=self.forwardsvc(cvec_feature)
 
-            condition = torch.cat([svsc,svcc])+self.taskemb(tasktype)[:, None, :]
+            condition = self.mixencoder(torch.cat([svsc,svcc])+self.taskemb(tasktype)[:, None, :])
         elif svsu:
             mask=svsmask
             svsc=self.forwardsvs(txt_tokens=txt_tokens,mel2ph=mel2ph,key_shift=key_shift,speed=speed,kwargs=kwargs)
 
-            condition = svsc+self.taskemb(tasktype)[:, None, :]
+            condition = self.mixencoder(svsc+self.taskemb(tasktype)[:, None, :])
 
         elif svcu:
             mask=svcmask
             svcc=self.forwardsvc(cvec_feature)
 
 
-            condition=svcc+self.taskemb(tasktype)[:, None, :]
+            condition=self.mixencoder(svcc+self.taskemb(tasktype)[:, None, :])
 
         f0_mel = (1 + f0 / 700).log()
         pitch_embed = self.pitch_embed(f0_mel[:, :, None])
@@ -94,4 +94,4 @@ class ssvm(nn.Module):
            **kwargs)
     def forwardsvc(self,feature):
         # torch
-        return self.mixencoder(self.svcin(feature.transpose(1,2)))
+        return self.svcin(feature.transpose(1,2))

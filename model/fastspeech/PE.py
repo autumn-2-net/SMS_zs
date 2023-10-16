@@ -108,6 +108,7 @@ class RelPositionalEncoding(PositionalEncoding):
             torch.Tensor: Positional embedding tensor (1, time, `*`).
         """
         self.extend_pe(x)
-        x = x * self.xscale
+        # x = x * self.xscale
         pos_emb = self.pe[:, : x.size(1)]
-        return self.dropout(x) + self.dropout(pos_emb)
+        # return self.dropout(x) + self.dropout(pos_emb)
+        return x+ pos_emb

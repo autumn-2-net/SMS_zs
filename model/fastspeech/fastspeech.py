@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -5,6 +7,7 @@ import torch.nn.functional as F
 
 from model.attention.attention_lay import attn_lay
 from model.fastspeech.PE import RelPositionalEncoding
+# from model.fastspeech.fast_speech import FastSpeech2Encoder
 from utils.datapre_ph import mel2ph_to_dur
 
 
@@ -18,16 +21,30 @@ class fs_encoder(nn.Module):
             x=i(x,mask)
         return x
 
+class NormalInitEmbedding(torch.nn.Embedding):
+    def __init__(
+            self,
+            num_embeddings: int,
+            embedding_dim: int,
+            padding_idx: int | None = None,
+            *args,
+            **kwargs
+    ):
+        super().__init__(num_embeddings, embedding_dim, *args, padding_idx=padding_idx, **kwargs)
+        nn.init.normal_(self.weight, mean=0, std=self.embedding_dim ** -0.5)
+        if padding_idx is not None:
+            nn.init.constant_(self.weight[padding_idx], 0)
 
 class fastspeech2(nn.Module): #B T C
     def __init__(self,vocab_size,config:dict):
         super().__init__()
 
         self.txt_embed = nn.Embedding(vocab_size, config['fs2_hidden_size'], padding_idx=0)
+        # self.txt_embed = NormalInitEmbedding(vocab_size, config['fs2_hidden_size'], padding_idx=0)
         self.dur_embed = nn.Linear(1, config['fs2_hidden_size'])
 
         self.encoder = fs_encoder(dim=config['fs2_hidden_size'],lays=config['fs2_lays'], heads=config['fs2_heads'], dim_head=config['fs2_dim_head'],hideen_dim=config.get('fs2_latent_dim'),kernel_size=config['fs2_kernel_size'])
-
+        # self.encoder = FastSpeech2Encoder(input_size=256)
 
         self.variance_embed_list = []
         self.use_energy_embed = config.get('use_energy_embed', False)
@@ -55,7 +72,11 @@ class fastspeech2(nn.Module): #B T C
             self.speed_embed = nn.Linear(1, config['fs2_hidden_size'])
 
         self.embed_positions = RelPositionalEncoding(config['fs2_hidden_size'], dropout_rate=0.0)
+        self.xscale = math.sqrt(config['fs2_hidden_size'])
 
+        self.embed_scale = math.sqrt(config['fs2_hidden_size'])
+
+        self.last_norm=nn.LayerNorm(config['fs2_hidden_size'])
 
     def forward_variance_embedding(self, condition, key_shift=None, speed=None, **variances):
         if self.use_variance_embeds:
@@ -75,19 +96,22 @@ class fastspeech2(nn.Module): #B T C
 
         return condition
 
-    def femb(self,x,dur):
-        x=x+dur
-        x=self.embed_positions (x)
+    def femb(self,x,):
+        # x=x*self.xscale+dur
+        x=self.embed_positions (self.xscale*x)
 
         return x
 
 
     def forward(self, txt_tokens,mel2ph,  key_shift=None, speed=None,
            **kwargs):
-        txt_embed = self.txt_embed(txt_tokens)
-        dur = mel2ph_to_dur(mel2ph, txt_tokens.shape[1]).float()
-        dur_embed = self.dur_embed(dur[:, :, None])
-        encoder_out = self.encoder(self.femb(txt_embed, dur_embed), txt_tokens != 0)
+        txt_embed = self.txt_embed(txt_tokens)#*self.embed_scale
+        # dur = mel2ph_to_dur(mel2ph, txt_tokens.shape[1]).float()  坑货东西
+        # dur_embed = self.dur_embed(dur[:, :, None])
+        encoder_out = self.encoder(self.femb(txt_embed, ), txt_tokens != 0
+                                   )
+        encoder_out=self.last_norm(encoder_out)
+        # encoder_out = self.encoder(self.femb(txt_embed, dur_embed), None)
 
 
         encoder_out = F.pad(encoder_out, [0, 0, 1, 0])

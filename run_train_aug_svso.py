@@ -6,11 +6,11 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from PL_callbacks.save_checkpoint import ModelCheckpoints
 from utils.config_loader import get_config
 # from utils_model.ssvc import ssvc
-from utils_model.ssvc_v2_waug_v2 import ssvc
+from utils_model.ssvc_v2_waug_v2_svso import ssvc
 import lightning as pl
 
 
-config=get_config('configs/a_v2_aug.yaml')
+config=get_config('configs/a_v2_augtest.yaml')
 # config=get_config('configs/a1.yaml')
 config.update({'infer':False})
 
@@ -20,7 +20,7 @@ models_ssvc.build_losses_and_metrics()
 
 # work_dir = pathlib.Path(config['base_work_dir'])/'testckpt'
 # work_dir = pathlib.Path(config['base_work_dir'])/'largex_v4x'
-work_dir = pathlib.Path(config['base_work_dir'])/'aug_2encoder_1_ff0_ne'
+work_dir = pathlib.Path(config['base_work_dir'])/'aug_2encoder_sc5_svso_2'
 if __name__ == '__main__':
     trainer = pl.Trainer(
         accelerator=config['pl_trainer_accelerator'],
@@ -62,5 +62,5 @@ if __name__ == '__main__':
     )
     # models_ssvc.load_state_dict(torch.load(r'D:\propj\sum_a\ckpt\aug_v1_llr\model_ckpt_steps_53999.ckpt')['state_dict'])
 
-    trainer.fit(models_ssvc,ckpt_path=r'D:\propj\sum_a\ckpt\aug_2encoder_1_ff0_ne\model_ckpt_steps_343999.ckpt' #ckpt_path=get_latest_checkpoint_path(work_dir)
+    trainer.fit(models_ssvc,#ckpt_path=r'D:\propj\sum_a\ckpt\largex_v4\model_ckpt_steps_11999.ckpt' #ckpt_path=get_latest_checkpoint_path(work_dir)
                 )

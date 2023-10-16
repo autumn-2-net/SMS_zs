@@ -19,7 +19,7 @@ class SVS_Dataset:
             reader = list(csv.DictReader(csvfile))
 
         if not is_main_process:
-            torch.set_num_threads(2)
+            torch.set_num_threads(1)
         self.didx=reader
         self.dalen=len(self.didx)
         self.config=config
@@ -61,6 +61,7 @@ class SVS_Dataset:
         f0 *= 2 ** (key_shift / 12)
         length=len(mel)
         # ''.strip().split(' ')
+        # sst=[float(i) for i in data['ph_dur'].strip().split(' ')]
         mel2ph=get_mel2ph_torch(
             self.lr, torch.tensor([float(i) for i in data['ph_dur'].strip().split(' ')]), length, self.timestep, device='cpu'
         ).cpu().numpy()
@@ -85,7 +86,7 @@ class SVC_Dataset:
             reader = list(csv.DictReader(csvfile))
 
         if not is_main_process:
-            torch.set_num_threads(2)
+            torch.set_num_threads(1)
         self.didx=reader
         self.dalen=len(self.didx)
         self.config=config
