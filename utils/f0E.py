@@ -54,7 +54,14 @@ def get_f0(path_srcfile,sampling_rate,f0_extractor,f0_min,f0_max,hop_length,melL
 
     uv = f0 == 0
     if len(f0[~uv]) > 0:
+        rpxd=f0[~uv]
         # interpolate the unvoiced f0
+        cptx=np.where(uv)
+        cptx1= np.where(~uv)
+        ddftp=f0[~uv]
+
+        cptxxx=np.where(uv)[0]
+        cptx1xx= np.where(~uv)[0]
         f0[uv] = np.interp(np.where(uv)[0], np.where(~uv)[0], f0[~uv])
         uv = uv.astype('float')
         uv = np.min(np.array([uv[:-2], uv[1:-1], uv[2:]]), axis=0)
